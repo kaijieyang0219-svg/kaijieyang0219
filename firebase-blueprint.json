@@ -1,0 +1,59 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile and Role",
+      "description": "User documents containing role, health goals, and relationships.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "The unique identifier of the user matching their Firebase Auth UID." },
+        "email": { "type": "string", "description": "The email address of the user." },
+        "name": { "type": "string", "description": "The displayed name of the user." },
+        "role": { "type": "string", "enum": ["admin", "teacher", "caregiver", "student", "pending"], "description": "Assigned access control role." },
+        "gender": { "type": "string", "enum": ["male", "female", "other"] },
+        "birthdate": { "type": "string" },
+        "height": { "type": "number" },
+        "weight": { "type": "number" },
+        "activityLevel": { "type": "string", "enum": ["sedentary", "light", "moderate", "high"] },
+        "calorieTarget": { "type": "number" },
+        "proteinTarget": { "type": "number" },
+        "fatTarget": { "type": "number" },
+        "carbTarget": { "type": "number" },
+        "fiberTarget": { "type": "number" },
+        "sodiumTarget": { "type": "number" },
+        "sugarTarget": { "type": "number" },
+        "teacherId": { "type": "string" },
+        "caregiverId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "name", "role"]
+    },
+    "Meal": {
+      "title": "Meal Record",
+      "description": "Meal entries recorded of what has been eaten.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string", "enum": ["breakfast", "lunch", "dinner", "snack"] },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "foods": { "type": "array" },
+        "image": { "type": "string" },
+        "advice": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "type", "date", "time", "foods"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Primary user profiles and roles"
+    },
+    "/users/{userId}/meals/{mealId}": {
+      "schema": "Meal",
+      "description": "Subcollection of meal records for each user"
+    }
+  }
+}

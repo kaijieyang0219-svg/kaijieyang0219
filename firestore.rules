@@ -1,0 +1,123 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Catch-all default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper: is user signed in
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Helper: is owner of userId
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Helper: is user active administrator
+    function isAdmin() {
+      return isSignedIn() && (
+        (request.auth.token.email == "kaijieyang0219@gmail.com" && request.auth.token.email_verified == true) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin")
+      );
+    }
+
+    // Helper: is user a verified linked trainer/teacher or caregiver or admin to view a student's logs
+    function isUserLinked(userId) {
+      return isOwner(userId) ||
+             isAdmin() || (
+               exists(/databases/$(database)/documents/users/$(userId)) && (
+                 get(/databases/$(database)/documents/users/$(userId)).data.teacherId == request.auth.uid ||
+                 get(/databases/$(database)/documents/users/$(userId)).data.caregiverId == request.auth.uid
+               )
+             );
+    }
+
+    // Helper: validate user document schema
+    function isValidUser(data) {
+      return data.uid is string && data.uid.size() <= 128 &&
+             data.email is string && data.email.size() <= 128 &&
+             data.name is string && data.name.size() <= 128 &&
+             data.role is string && (
+               data.role == "admin" || 
+               data.role == "teacher" || 
+               data.role == "caregiver" || 
+               data.role == "student" || 
+               data.role == "pending"
+             );
+    }
+
+    // Helper: validate meal document schema
+    function isValidMeal(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.type is string && (
+               data.type == "breakfast" || 
+               data.type == "lunch" || 
+               data.type == "dinner" || 
+               data.type == "snack"
+             ) &&
+             data.date is string && data.date.size() <= 32 &&
+             data.time is string && data.time.size() <= 16 &&
+             data.foods is list && data.foods.size() <= 20;
+    }
+
+    // User Profile matching rules
+    match /users/{userId} {
+      // Any signed user can get other profiles for linked relations, but list queries must be secured
+      allow get: if isSignedIn();
+      allow list: if isAdmin() || isOwner(userId) || (
+        exists(/databases/$(database)/documents/users/$(userId)) && (
+          get(/databases/$(database)/documents/users/$(userId)).data.teacherId == request.auth.uid ||
+          get(/databases/$(database)/documents/users/$(userId)).data.caregiverId == request.auth.uid
+        )
+      );
+
+      // Create: User can sign up as pending or pre-bootstrap admin
+      allow create: if isSignedIn() && isOwner(userId) && isValidUser(request.resource.data) && (
+        (request.auth.token.email == "kaijieyang0219@gmail.com" && request.resource.data.role == "admin") ||
+        (request.resource.data.role == "pending")
+      );
+
+      // Update: Admin can override anything. User can update their details but cannot alter role or relative manager ties directly.
+      allow update: if isSignedIn() && (
+        isAdmin() || (
+          isOwner(userId) &&
+          isValidUser(request.resource.data) &&
+          request.resource.data.email == resource.data.email &&
+          request.resource.data.uid == resource.data.uid &&
+          request.resource.data.role == resource.data.role &&
+          (!resource.data.keys().hasAll(["teacherId"]) || request.resource.data.teacherId == resource.data.teacherId) &&
+          (!resource.data.keys().hasAll(["caregiverId"]) || request.resource.data.caregiverId == resource.data.caregiverId)
+        )
+      );
+
+      // Only Administrator can erase/delete profiles
+      allow delete: if isAdmin();
+
+      // Subcollection: meals rules
+      match /meals/{mealId} {
+        allow read: if isUserLinked(userId);
+        
+        allow create: if isOwner(userId) && isValidMeal(request.resource.data);
+
+        // Update block: Owner can edit except their advice. Teacher/Admin can only modify advice.
+        allow update: if (
+          (isOwner(userId) && isValidMeal(request.resource.data) &&
+           (!request.resource.data.keys().hasAll(["advice"]) || request.resource.data.advice == resource.data.advice)) ||
+          ((isAdmin() || (exists(/databases/$(database)/documents/users/$(userId)) && get(/databases/$(database)/documents/users/$(userId)).data.teacherId == request.auth.uid)) &&
+           request.resource.data.id == resource.data.id &&
+           request.resource.data.type == resource.data.type &&
+           request.resource.data.date == resource.data.date &&
+           request.resource.data.time == resource.data.time &&
+           request.resource.data.foods == resource.data.foods)
+        );
+
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+    }
+  }
+}

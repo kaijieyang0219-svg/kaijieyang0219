@@ -1,0 +1,10 @@
+{
+  "name": "飲控系統",
+  "description": "支援 AI 飲食照片辨識、手動輸入紀錄、營養與趨勢圖表分析、目標設定、多角色切換與家庭學員管理的飲食管理控制系統 (Diet Management UI)。",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
